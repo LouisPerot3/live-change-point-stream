@@ -7,16 +7,17 @@ import yfinance as yf
 import joblib
 import requests
 import datetime
-import time
+from streamlit_autorefresh import st_autorefresh
 
+# ====== PARAMS ======
 MODEL_PATH = "ML_model.pkl"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1361352885786644672/UcHkWLhKJDHnbriFJCBTzmb5HshkJ2T-ZzWHQCwmN4Vxsx8BTlDNTImQpb1qFsoWxGoE"
 
+# ====== FEATURES ======
 def generate_features(returns: pd.Series, window: int = 60):
     if len(returns) < window:
         return None
-    window_data = returns[-window:]
-    s = pd.Series(window_data)
+    s = pd.Series(returns[-window:].flatten())
     feats = pd.DataFrame([{
         "mean": float(s.mean()),
         "std": float(s.std()),
@@ -28,90 +29,84 @@ def generate_features(returns: pd.Series, window: int = 60):
     }])
     return feats
 
+# ====== DISCORD ======
 def send_discord_alert(ticker, proba, direction):
     emoji = "⬆️" if direction == "hausse" else "⬇️"
-    message = f"⚠️ Rupture sur `{ticker}` {emoji} - Probabilité: {proba:.2%}"
+    message = f"\u26a0\ufe0f Rupture sur `{ticker}` {emoji} - Probabilité: {proba:.2%}"
     try:
         requests.post(DISCORD_WEBHOOK_URL, json={"content": message})
     except Exception as e:
-        print("[Discord] Erreur alerte:", e)
+        print("[Discord] Erreur:", e)
 
 def send_discord_start_message(tickers):
-    if isinstance(tickers, str):
-        tickers = [tickers]
+    if isinstance(tickers, str): tickers = [tickers]
     for t in tickers:
-        message = f"🚀 Détection live lancée sur `{t}`"
         try:
-            requests.post(DISCORD_WEBHOOK_URL, json={"content": message})
-        except Exception as e:
-            print(f"[Discord] Erreur pour {t}:", e)
+            requests.post(DISCORD_WEBHOOK_URL, json={"content": f"🚀 Détection live lancée sur `{t}`"})
+        except: pass
 
+# ====== FETCH RETURNS ======
 def fetch_returns(ticker="AAPL", period="7d", interval="1m"):
-    try:
-        df = yf.download(ticker, period=period, interval=interval)
-        if df.empty or "Close" not in df.columns:
-            st.error(f"⛔ Le ticker `{ticker}` est invalide ou ne retourne aucune donnée.")
-            return None
-        prices = df["Close"].dropna()
-        returns = np.log(prices / prices.shift(1)).dropna()
-        # 🔧 Correction clé ici :
-        returns = pd.Series(returns.values.flatten(), index=prices.index[-len(returns):])
-        print("✅ Shape des returns:", returns.shape)
-        return returns
-    except Exception as e:
-        st.error(f"❌ Erreur lors du chargement du ticker `{ticker}` : {e}")
+    df = yf.download(ticker, period=period, interval=interval)
+    if df.empty or "Close" not in df.columns:
         return None
+    prices = df["Close"].dropna()
+    returns = np.log(prices / prices.shift(1)).dropna()
+    return pd.Series(returns.values.flatten(), index=prices.index[-len(returns):])
 
+# ====== STREAMLIT DASHBOARD ======
 def run_dashboard():
-    st.title("Multi-Ticker Live Change Point Detection")
+    st_autorefresh(interval=30000, key="refresh")  # auto-refresh every 30s
 
-    tickers_input = st.text_input("Tickers à surveiller (séparés par des virgules)", value="AAPL,MSFT")
-    window = st.slider("Taille de la fenêtre (features)", 30, 120, 60)
-    interval = st.slider("Fréquence de mise à jour (secondes)", 10, 60, 30)
-    enable_alerts = st.checkbox("Activer les alertes Discord")
+    st.title("🌎 Live Change Point Detection - Cloud Mode")
+
+    tickers_input = st.text_input("Tickers à surveiller (ex: AAPL, BTC-USD)", value="AAPL,MSFT")
+    window = st.slider("Fenêtre d'analyse (features)", 30, 120, 60)
+    enable_alerts = st.checkbox("🚨 Alertes Discord", value=True)
 
     tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
-    if enable_alerts:
-        send_discord_start_message(tickers)
-
     model = joblib.load(MODEL_PATH)
-    placeholders = {ticker: st.empty() for ticker in tickers}
-    last_status = {ticker: None for ticker in tickers}
 
-    if st.button("🔄 Rafraîchir les données maintenant"):
-         for ticker in tickers:
-            data = fetch_returns(ticker)
-            if data is None or len(data) < window:
-                    placeholders[ticker].warning(f"Pas de données valides pour {ticker}")
-                    continue
+    placeholders = {t: st.empty() for t in tickers}
+    last_status = st.session_state.get("last_status", {t: None for t in tickers})
 
-            X = generate_features(data, window)
-            if X is None:
-                placeholders[ticker].warning(f"Pas assez de données pour {ticker}")
-                continue
+    if enable_alerts and not st.session_state.get("startup_msg_sent", False):
+        send_discord_start_message(tickers)
+        st.session_state["startup_msg_sent"] = True
 
-            proba = model.predict_proba(X)[0][1]
-            pred = model.predict(X)[0]
+    for ticker in tickers:
+        returns = fetch_returns(ticker)
+        if returns is None or len(returns) < window:
+            placeholders[ticker].warning(f"Pas de données valides pour {ticker}")
+            continue
 
-            if pred == 1:
-                direction = "hausse" if X["mean"].iloc[0] > 0 else "baisse"
-                label = f"Rupture probable ({direction})"
-                couleur = "red"
-                if enable_alerts and last_status[ticker] != 1:
-                    send_discord_alert(ticker, proba, direction)
-            else:
-                label = f"Stabilité probable"
-                couleur = "green"
+        X = generate_features(returns, window)
+        if X is None:
+            placeholders[ticker].warning(f"Données insuffisantes pour {ticker}")
+            continue
 
-            fig = make_subplots(specs=[[{"secondary_y": False}]])
-            fig.add_trace(go.Scatter(x=data.index, y=data.values, name="Log-returns", line=dict(color=couleur)))
-            fig.update_layout(title=f"{ticker} | {label} | P(Rupture): {proba:.2%}", height=400)
+        proba = model.predict_proba(X)[0][1]
+        pred = model.predict(X)[0]
+        direction = "hausse" if X["mean"].iloc[0] > 0 else "baisse"
 
-            placeholders[ticker].plotly_chart(fig, use_container_width=True)
-            last_status[ticker] = pred
+        if pred == 1:
+            label = f"Rupture probable ({direction})"
+            couleur = "red"
+            if enable_alerts and last_status.get(ticker) != 1:
+                send_discord_alert(ticker, proba, direction)
+        else:
+            label = "Stabilité probable"
+            couleur = "green"
 
-            st.caption(f"Mise à jour à {datetime.datetime.now().strftime('%H:%M:%S')}")
-            time.sleep(interval)
+        fig = make_subplots(specs=[[{"secondary_y": False}]])
+        fig.add_trace(go.Scatter(x=returns.index, y=returns.values, name="Log-returns", line=dict(color=couleur)))
+        fig.update_layout(title=f"{ticker} | {label} | P(Rupture): {proba:.2%}", height=400)
+
+        placeholders[ticker].plotly_chart(fig, use_container_width=True)
+        last_status[ticker] = pred
+
+    st.session_state["last_status"] = last_status
+    st.caption(f"🔄 Mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')} - toutes les 30s")
 
 if __name__ == "__main__":
     run_dashboard()
