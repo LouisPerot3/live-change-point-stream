@@ -55,7 +55,7 @@ def fetch_returns(ticker="AAPL", period="7d", interval="1m"):
         prices = df["Close"].dropna()
         returns = np.log(prices / prices.shift(1)).dropna()
         # 🔧 Correction clé ici :
-        returns = pd.Series(np.ravel(returns), index=returns.index)
+        returns = pd.Series(returns.values.flatten(), index=prices.index[-len(returns):])
         return returns
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement du ticker `{ticker}` : {e}")
