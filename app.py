@@ -78,10 +78,10 @@ def run_dashboard():
     placeholders = {ticker: st.empty() for ticker in tickers}
     last_status = {ticker: None for ticker in tickers}
 
-        if st.button("🔄 Rafraîchir les données maintenant"):
-            for ticker in tickers:
-                data = fetch_returns(ticker)
-                if data is None or len(data) < window:
+    if st.button("🔄 Rafraîchir les données maintenant"):
+         for ticker in tickers:
+            data = fetch_returns(ticker)
+            if data is None or len(data) < window:
                     placeholders[ticker].warning(f"Pas de données valides pour {ticker}")
                     continue
 
