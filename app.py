@@ -8,7 +8,7 @@ import joblib
 import requests
 import datetime
 
-MODEL_PATH = "lightgbm_model.pkl"
+MODEL_PATH = "ML_model.pkl"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1361352885786644672/UcHkWLhKJDHnbriFJCBTzmb5HshkJ2T-ZzWHQCwmN4Vxsx8BTlDNTImQpb1qFsoWxGoE"
 
 def generate_features(returns: pd.Series, window: int = 60):
@@ -53,7 +53,7 @@ def fetch_returns(ticker="AAPL", period="7d", interval="1m"):
             return None
         prices = df["Close"].dropna()
         returns = np.log(prices / prices.shift(1)).dropna()
-        returns = pd.Series(returns.values, index=prices.index[-len(returns):])
+        returns = pd.Series(returns.values.flatten(), index=prices.index[-len(returns):])
         return returns
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement du ticker `{ticker}` : {e}")
