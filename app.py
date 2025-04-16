@@ -56,6 +56,7 @@ def fetch_returns(ticker="AAPL", period="7d", interval="1m"):
         returns = np.log(prices / prices.shift(1)).dropna()
         # 🔧 Correction clé ici :
         returns = pd.Series(returns.values.flatten(), index=prices.index[-len(returns):])
+        print("✅ Shape des returns:", returns.shape)
         return returns
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement du ticker `{ticker}` : {e}")
