@@ -110,8 +110,8 @@ def run_dashboard():
             placeholders[ticker].plotly_chart(fig, use_container_width=True)
             last_status[ticker] = pred
 
-        st.caption(f"Mise à jour à {datetime.datetime.now().strftime('%H:%M:%S')}")
-        time.sleep(interval)
+            st.caption(f"Mise à jour à {datetime.datetime.now().strftime('%H:%M:%S')}")
+            time.sleep(interval)
 
 if __name__ == "__main__":
     run_dashboard()
