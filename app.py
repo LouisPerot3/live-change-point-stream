@@ -17,7 +17,7 @@ DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1361352885786644672/UcHk
 def generate_features(returns: pd.Series, window: int = 60):
     if len(returns) < window:
         return None
-    s = pd.Series(returns[-window:].flatten())
+    s = pd.Series(returns[-window:].values)
     feats = pd.DataFrame([{
         "mean": float(s.mean()),
         "std": float(s.std()),
