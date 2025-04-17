@@ -10,7 +10,8 @@ import datetime
 from streamlit_autorefresh import st_autorefresh
 
 # ====== PARAMS ======
-MODEL_PATH = "ML_model.pkl"
+MODEL_PATH = "xgb_model_v5.pkl"
+SCALER_PATH = "scaler_v5.pkl"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1361352885786644672/UcHkWLhKJDHnbriFJCBTzmb5HshkJ2T-ZzWHQCwmN4Vxsx8BTlDNTImQpb1qFsoWxGoE"
 
 # ====== FEATURES ======
