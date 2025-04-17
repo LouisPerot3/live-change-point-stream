@@ -8,6 +8,7 @@ import joblib
 import requests
 import datetime
 from streamlit_autorefresh import st_autorefresh
+from xgboost import XGBClassifier
 
 # ====== PARAMS ======
 MODEL_PATH = "xgb_model_v5.pkl"
