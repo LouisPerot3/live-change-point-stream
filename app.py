@@ -4,17 +4,19 @@ import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import yfinance as yf
+import xgboost as xgb
 import joblib
 import requests
 import datetime
 from streamlit_autorefresh import st_autorefresh
-from xgboost import XGBClassifier
 
 # ====== PARAMS ======
-MODEL_PATH = "xgb_model_v5.pkl"
+MODEL_PATH = "xgb_model_v5.json"
 SCALER_PATH = "scaler_v5.pkl"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1361352885786644672/UcHkWLhKJDHnbriFJCBTzmb5HshkJ2T-ZzWHQCwmN4Vxsx8BTlDNTImQpb1qFsoWxGoE"
+
 scaler = joblib.load(SCALER_PATH)
+
 # ====== FEATURES ======
 def generate_features(returns: pd.Series, window: int = 60):
     if len(returns) < window:
@@ -45,7 +47,8 @@ def send_discord_start_message(tickers):
     for t in tickers:
         try:
             requests.post(DISCORD_WEBHOOK_URL, json={"content": f"🚀 Détection live lancée sur `{t}`"})
-        except: pass
+        except:
+            pass
 
 # ====== FETCH RETURNS ======
 def fetch_returns(ticker="AAPL", period="7d", interval="1m"):
@@ -60,14 +63,17 @@ def fetch_returns(ticker="AAPL", period="7d", interval="1m"):
 def run_dashboard():
     st_autorefresh(interval=30000, key="refresh")  # auto-refresh every 30s
 
-    st.title("🌎 Live Change Point Detection - Cloud Mode")
+    st.title("🌎 Live Change Point Detection - Cloud Mode (v5)")
 
     tickers_input = st.text_input("Tickers à surveiller (ex: AAPL, BTC-USD)", value="AAPL,MSFT")
     window = st.slider("Fenêtre d'analyse (features)", 30, 120, 60)
     enable_alerts = st.checkbox("🚨 Alertes Discord", value=True)
 
     tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
-    model = joblib.load(MODEL_PATH)
+
+    # 🔁 Load XGBoost model from .json
+    model = xgb.XGBClassifier()
+    model.load_model(MODEL_PATH)
 
     placeholders = {t: st.empty() for t in tickers}
     last_status = st.session_state.get("last_status", {t: None for t in tickers})
@@ -86,9 +92,10 @@ def run_dashboard():
         if X is None:
             placeholders[ticker].warning(f"Données insuffisantes pour {ticker}")
             continue
-        X = scaler.transform(X)
-        proba = model.predict_proba(X)[0][1]
-        pred = model.predict(X)[0]
+
+        X_scaled = scaler.transform(X)
+        proba = model.predict_proba(X_scaled)[0][1]
+        pred = model.predict(X_scaled)[0]
         direction = "hausse" if X[0][0] > 0 else "baisse"
 
         if pred == 1:
