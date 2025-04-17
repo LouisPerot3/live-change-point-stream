@@ -13,21 +13,21 @@ from streamlit_autorefresh import st_autorefresh
 MODEL_PATH = "xgb_model_v5.pkl"
 SCALER_PATH = "scaler_v5.pkl"
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1361352885786644672/UcHkWLhKJDHnbriFJCBTzmb5HshkJ2T-ZzWHQCwmN4Vxsx8BTlDNTImQpb1qFsoWxGoE"
-
+scaler = joblib.load(SCALER_PATH)
 # ====== FEATURES ======
 def generate_features(returns: pd.Series, window: int = 60):
     if len(returns) < window:
         return None
-    s = pd.Series(returns[-window:].values)
-    feats = pd.DataFrame([{
-        "mean": float(s.mean()),
-        "std": float(s.std()),
-        "skew": float(s.skew()),
-        "kurt": float(s.kurt()),
-        "min": float(s.min()),
-        "max": float(s.max()),
-        "last": float(s.iloc[-1]),
-    }])
+    s = pd.Series(returns[-window:].values.flatten())
+    feats = np.array([[
+        s.mean(),
+        s.std(),
+        s.skew(),
+        s.kurt(),
+        s.min(),
+        s.max(),
+        s.iloc[-1],
+    ]])
     return feats
 
 # ====== DISCORD ======
@@ -85,10 +85,10 @@ def run_dashboard():
         if X is None:
             placeholders[ticker].warning(f"Données insuffisantes pour {ticker}")
             continue
-
+        X = scaler.transform(X)
         proba = model.predict_proba(X)[0][1]
         pred = model.predict(X)[0]
-        direction = "hausse" if X["mean"].iloc[0] > 0 else "baisse"
+        direction = "hausse" if X[0][0] > 0 else "baisse"
 
         if pred == 1:
             label = f"Rupture probable ({direction})"
