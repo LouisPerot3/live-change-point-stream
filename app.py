@@ -93,7 +93,15 @@ def run_dashboard():
         if returns is None or len(returns) < window:
             placeholders[ticker].warning(f"Pas de données valides pour {ticker}")
             continue
+        # 🔍 Vérifie si la dernière donnée est trop ancienne (ex: marché fermé)
+        now = datetime.datetime.now(pytz.timezone("Europe/Paris"))
+        last_data_time = returns.index[-1].to_pydatetime()
 
+        delta_minutes = (now - last_data_time).total_seconds() / 60
+
+        if delta_minutes > 15:
+            placeholders[ticker].info(f"📉 {ticker} — Marché fermé (dernière donnée à {last_data_time.strftime('%H:%M')})")
+            continue
         X = generate_features(returns, window)
         if X is None:
             placeholders[ticker].warning(f"Données insuffisantes pour {ticker}")
