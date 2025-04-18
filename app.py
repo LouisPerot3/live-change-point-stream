@@ -58,7 +58,7 @@ def fetch_returns(ticker="AAPL", period="7d", interval="1m"):
         return None
 
     # 🕒 Corrige le fuseau horaire : UTC ➜ Europe/Paris
-    df.index = df.index.tz_localize("UTC").tz_convert("Europe/Paris")
+    df.index = df.index.tz_convert("Europe/Paris")
 
     prices = df["Close"].dropna()
     returns = np.log(prices / prices.shift(1)).dropna()
