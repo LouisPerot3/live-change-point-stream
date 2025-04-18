@@ -9,6 +9,7 @@ import joblib
 import requests
 import datetime
 from streamlit_autorefresh import st_autorefresh
+import pytz
 
 # ====== PARAMS ======
 MODEL_PATH = "xgb_model_v5.json"
@@ -51,12 +52,17 @@ def send_discord_start_message(tickers):
             pass
 
 # ====== FETCH RETURNS ======
-def fetch_returns(ticker="AAPL", period="7d", interval="1m"):
+    def fetch_returns(ticker="AAPL", period="7d", interval="1m"):
     df = yf.download(ticker, period=period, interval=interval)
     if df.empty or "Close" not in df.columns:
         return None
+
+    # 🕒 Corrige le fuseau horaire : UTC ➜ Europe/Paris
+    df.index = df.index.tz_localize("UTC").tz_convert("Europe/Paris")
+
     prices = df["Close"].dropna()
     returns = np.log(prices / prices.shift(1)).dropna()
+
     return pd.Series(returns.values.flatten(), index=prices.index[-len(returns):])
 
 # ====== STREAMLIT DASHBOARD ======
