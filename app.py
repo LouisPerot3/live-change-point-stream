@@ -99,7 +99,7 @@ def run_dashboard():
 
         delta_minutes = (now - last_data_time).total_seconds() / 60
 
-        if delta_minutes > 15:
+        if delta_minutes > 25:
             placeholders[ticker].info(f"📉 {ticker} — Marché fermé (dernière donnée à {last_data_time.strftime('%H:%M')})")
             continue
         X = generate_features(returns, window)
